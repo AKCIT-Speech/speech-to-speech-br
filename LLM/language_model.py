@@ -25,6 +25,7 @@ WHISPER_LANGUAGE_TO_LLM_LANGUAGE = {
     "zh": "chinese",
     "ja": "japanese",
     "ko": "korean",
+    "pt": "portuguese",
 }
 
 class LanguageModelHandler(BaseHandler):
@@ -36,10 +37,10 @@ class LanguageModelHandler(BaseHandler):
         self,
         model_name="microsoft/Phi-3-mini-4k-instruct",
         device="cuda",
-        torch_dtype="float16",
+        torch_dtype="bfloat16",
         gen_kwargs={},
         user_role="user",
-        chat_size=1,
+        chat_size=20,
         init_chat_role=None,
         init_chat_prompt="You are a helpful AI assistant.",
     ):
@@ -50,6 +51,7 @@ class LanguageModelHandler(BaseHandler):
         self.model = AutoModelForCausalLM.from_pretrained(
             model_name, torch_dtype=torch_dtype, trust_remote_code=True
         ).to(device)
+        
         self.pipe = pipeline(
             "text-generation", model=self.model, tokenizer=self.tokenizer, device=device
         )

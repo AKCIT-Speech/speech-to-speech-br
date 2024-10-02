@@ -19,6 +19,7 @@ SUPPORTED_LANGUAGES = [
     "zh",
     "ja",
     "ko",
+    "pt",
 ]
 
 
@@ -33,7 +34,7 @@ class WhisperSTTHandler(BaseHandler):
         device="cuda",
         torch_dtype="float16",
         compile_mode=None,
-        language=None,
+        language="pt",
         gen_kwargs={},
     ):
         self.device = device
@@ -86,6 +87,7 @@ class WhisperSTTHandler(BaseHandler):
                     "max_new_tokens"
                 ],  # Yes, assign max_new_tokens to min_new_tokens
                 "max_new_tokens": self.gen_kwargs["max_new_tokens"],
+                "language" : "portuguese",
                 **self.gen_kwargs,
             }
         else:
