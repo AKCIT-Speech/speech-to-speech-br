@@ -53,7 +53,8 @@ class LanguageModelHandler(BaseHandler):
         ).to(device)
         
         self.pipe = pipeline(
-            "text-generation", model=self.model, tokenizer=self.tokenizer, device=device
+            "text-generation", model=self.model, tokenizer=self.tokenizer, device=device, pad_token_id = self.tokenizer.eos_token_id
+
         )
         self.streamer = TextIteratorStreamer(
             self.tokenizer,
