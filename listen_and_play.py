@@ -4,9 +4,6 @@ from queue import Queue
 from dataclasses import dataclass, field
 import sounddevice as sd
 from transformers import HfArgumentParser
-import cv2
-import struct
-import numpy as np
 
 
 @dataclass
@@ -31,10 +28,6 @@ class ListenAndPlayArguments:
         default=12346,
         metadata={"help": "The network port for receiving data. Default is 12346."},
     )
-    video_port: int = field(
-        default=12347,
-        metadata={"help": "The network port for sending video data. Default is 5001."},
-    )
 
 
 def listen_and_play(
@@ -44,18 +37,14 @@ def listen_and_play(
     host="localhost",
     send_port=12345,
     recv_port=12346,
-    video_port=12347,
 ):
-    video_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    video_socket.connect((host, video_port))
-    
     send_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     send_socket.connect((host, send_port))
 
     recv_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     recv_socket.connect((host, recv_port))
 
-    print("Recording, streaming audio and video...")
+    print("Recording and streaming...")
 
     stop_event = threading.Event()
     recv_queue = Queue()
@@ -94,22 +83,6 @@ def listen_and_play(
             if data:
                 recv_queue.put(data)
 
-    def send_video(stop_event, video_socket):
-        cap = cv2.VideoCapture(0)  # Abre a webcam
-        while not stop_event.is_set():
-            ret, frame = cap.read()
-            if ret:
-                # Redimensiona o frame para 224x224 (ou outro tamanho desejado)
-                frame = cv2.resize(frame, (224, 224))
-                # Converte para escala de cinza
-                frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-                # Serializa o frame
-                frame_bytes = frame.tobytes()
-                # Envia o tamanho do frame seguido pelo frame
-                video_socket.sendall(struct.pack('>I', len(frame_bytes)))
-                video_socket.sendall(frame_bytes)
-        cap.release()
-
     try:
         send_stream = sd.RawInputStream(
             samplerate=send_rate,
@@ -132,23 +105,19 @@ def listen_and_play(
         send_thread.start()
         recv_thread = threading.Thread(target=recv, args=(stop_event, recv_queue))
         recv_thread.start()
-        video_thread = threading.Thread(target=send_video, args=(stop_event, video_socket))
-        video_thread.start()
 
-        input("Pressione Enter para parar...")
+        input("Press Enter to stop...")
 
     except KeyboardInterrupt:
-        print("Transmissão finalizada.")
+        print("Finished streaming.")
 
     finally:
         stop_event.set()
         recv_thread.join()
         send_thread.join()
-        video_thread.join()
         send_socket.close()
         recv_socket.close()
-        video_socket.close()
-        print("Conexão fechada.")
+        print("Connection closed.")
 
 
 if __name__ == "__main__":

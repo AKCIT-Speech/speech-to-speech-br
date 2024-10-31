@@ -205,7 +205,6 @@ def initialize_queues_and_events():
         "spoken_prompt_queue": Queue(),
         "text_prompt_queue": Queue(),
         "lm_response_queue": Queue(),
-        "video_frame_queue": Queue(),  # Nova fila para quadros de vídeo
     }
 
 
@@ -232,7 +231,6 @@ def build_pipeline(
     spoken_prompt_queue = queues_and_events["spoken_prompt_queue"]
     text_prompt_queue = queues_and_events["text_prompt_queue"]
     lm_response_queue = queues_and_events["lm_response_queue"]
-    video_frame_queue = queues_and_events["video_frame_queue"]
     if module_kwargs.mode == "local":
         from connections.local_audio_streamer import LocalAudioStreamer
 
@@ -244,7 +242,6 @@ def build_pipeline(
     else:
         from connections.socket_receiver import SocketReceiver
         from connections.socket_sender import SocketSender
-        from connections.video_socket_receiver import VideoSocketReceiver
 
         comms_handlers = [
             SocketReceiver(
@@ -261,12 +258,6 @@ def build_pipeline(
                 host=socket_sender_kwargs.send_host,
                 port=socket_sender_kwargs.send_port,
             ),
-            VideoSocketReceiver(
-                stop_event,
-                video_frame_queue,
-                host=socket_receiver_kwargs.recv_host,
-                port=12347  # ou a porta desejada
-            )
         ]
 
     vad = VADHandler(
@@ -278,7 +269,7 @@ def build_pipeline(
     )
 
     stt = get_stt_handler(module_kwargs, stop_event, spoken_prompt_queue, text_prompt_queue, whisper_stt_handler_kwargs, paraformer_stt_handler_kwargs)
-    lm = get_llm_handler(module_kwargs, stop_event, text_prompt_queue, lm_response_queue, language_model_handler_kwargs, open_api_language_model_handler_kwargs, mlx_language_model_handler_kwargs, video_frame_queue)
+    lm = get_llm_handler(module_kwargs, stop_event, text_prompt_queue, lm_response_queue, language_model_handler_kwargs, open_api_language_model_handler_kwargs, mlx_language_model_handler_kwargs)
     tts = get_tts_handler(module_kwargs, stop_event, lm_response_queue, send_audio_chunks_queue, should_listen, parler_tts_handler_kwargs, melo_tts_handler_kwargs, chat_tts_handler_kwargs, x_tts_handler_kwargs)
 
     return ThreadManager([*comms_handlers, vad, stt, lm, tts])
@@ -320,31 +311,16 @@ def get_llm_handler(
     lm_response_queue, 
     language_model_handler_kwargs,
     open_api_language_model_handler_kwargs,
-    mlx_language_model_handler_kwargs,
-    video_frame_queue,
+    mlx_language_model_handler_kwargs
 ):
     if module_kwargs.llm == "transformers":
         from LLM.language_model import LanguageModelHandler
-        lm_handler = LanguageModelHandler(
+        return LanguageModelHandler(
             stop_event,
             queue_in=text_prompt_queue,
             queue_out=lm_response_queue,
             setup_kwargs=vars(language_model_handler_kwargs),
         )
-        
-        # Adicione um loop para atualizar o quadro de vídeo mais recente
-        def update_video_frame():
-            while not stop_event.is_set():
-                frame = video_frame_queue.get()
-                if frame == b"END":
-                    break
-                lm_handler.update_video_frame(frame)
-
-        import threading
-        video_update_thread = threading.Thread(target=update_video_frame)
-        video_update_thread.start()
-
-        return lm_handler
     elif module_kwargs.llm == "open_api":
         from LLM.openai_api_language_model import OpenApiModelHandler
         return OpenApiModelHandler(
