@@ -49,7 +49,7 @@ class OpenApiLanguageModelHandlerArguments:
         },
     )
     open_api_stream: bool = field(
-        default=False,
+        default=True,
         metadata={
             "help": "The stream parameter typically indicates whether data should be transmitted in a continuous flow rather"
                     " than in a single, complete response, often used for handling large or real-time data.Default is False"
